@@ -14,25 +14,31 @@ module.exports = library.export(
     // Above $1,000,000 total sales we have to file this? https://www.sec.gov/about/forms/forms-1.pdf
 
     function issueBond(id, amount, issuerName, repaymentSource, data) {
-
-      var bond = {
-        id: id,
-        amount: amount,
-        issuerName: issuerName,
-        repaymentSource: repaymentSource,
-        data: data,
-        shares: [],
-        paid: 0,
-      }
-
-      if (!bond.id) {
-        identifiable.assignId(bonds, bond)
-      }
-
-      bonds[bond.id] = bond
-
-      return bond
+      return new Bond(id, amount, issuerName, repaymentSource, data)
     }
+
+    function Bond(id, options) {
+
+      if (typeof id == "undefined") {
+        identifiable.assignId(bonds, this)
+      } else if (typeof id.id == "string") {
+        this.id = id
+      } else {
+        this.id = id
+      }
+
+      this.rateOfReturn = options.rateOfReturn
+      this.termLength = options.termLength
+
+      bonds[this.id] = this
+    }
+
+    Bond.prototype.addTasks = function() {
+    }
+
+    Bond.prototype.addExpense = function() {
+    }
+
 
     function orderShares(id, name, phoneNumber, bondId, faceValue) {
 
@@ -86,6 +92,8 @@ module.exports = library.export(
     var getBond = issueBond.get = identifiable.getFrom(bonds, {description: "bond"})
 
     issueBond.task = addTask
+
+
 
     issueBond.eachTaskTagged = eachTaskTagged
 
