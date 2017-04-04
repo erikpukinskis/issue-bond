@@ -1,0 +1,14 @@
+{
+  "name": "issue-bond",
+  "version": "0.0.0",
+  "description": "Let people take a bet on the future",
+  "main": "issue-bond.js",
+  "dependencies": {
+    "module-library": "*",
+    "identifiable": "*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/erikpukinskis/issue-bond.git"
+  }
+}
