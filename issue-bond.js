@@ -33,10 +33,10 @@ module.exports = library.export(
       bonds[this.id] = this
     }
 
-    Bond.prototype.addTasks = function() {
+    Bond.prototype.addTasks = Bond.prototype.tasks = function() {
     }
 
-    Bond.prototype.addExpense = function() {
+    Bond.prototype.addExpense = Bond.prototype.buy = function() {
     }
 
 
