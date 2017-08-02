@@ -22,7 +22,8 @@ module.exports = library.export(
 
       this.outcome = outcome
       this.issuerName = issuerName
-      
+      this.expenseList = []
+
       if (typeof id == "string") {
         this.id = id
       } else {
@@ -32,7 +33,12 @@ module.exports = library.export(
       bonds[this.id] = this
     }
 
-    Bond.prototype.tasks = function() {
+    Bond.prototype.tasks = function(additionalTasks) {
+      this.expenseList = this.expenseList.concat(additionalTasks)
+    }
+
+    Bond.prototype.getTasks = function() {
+      return this.expenseList
     }
 
     Bond.prototype.expenses = function() {
