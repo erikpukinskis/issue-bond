@@ -22,7 +22,9 @@ module.exports = library.export(
 
       this.outcome = outcome
       this.issuerName = issuerName
-      this.expenseList = []
+      this.totalsByDescription = {}
+      this.taskList = []
+      this.expensesSubtotal = 0
 
       if (typeof id == "string") {
         this.id = id
@@ -34,14 +36,53 @@ module.exports = library.export(
     }
 
     Bond.prototype.tasks = function(additionalTasks) {
-      this.expenseList = this.expenseList.concat(additionalTasks)
+      this.taskList = this.taskList.concat(additionalTasks)
     }
 
     Bond.prototype.getTasks = function() {
-      return this.expenseList
+      return this.taskList
     }
 
-    Bond.prototype.expenses = function() {
+    Bond.prototype.expenses = function(totalsByDescription) {
+      if (Array.isArray(totalsByDescription)) { return }
+
+      for(var description in totalsByDescription) {
+        var subtotal = parseMoney(totalsByDescription[description])
+        this.expensesSubtotal += subtotal
+        this.totalsByDescription[description] = subtotal
+      }
+    }
+
+    Bond.prototype.salePrice = function() {
+      return Math.floor(this.expensesSubtotal*1.1)
+    }
+
+    Bond.prototype.totalExpenses = function() {
+      return this.expensesSubtotal
+    }
+
+    Bond.prototype.profit = function() {
+      return this.salePrice() - this.totalExpenses()
+    }
+
+    function parseMoney(string) {
+      if (typeof string != "string") {
+        throw new Error("Expected "+string+" to be a string representing money")
+      }
+      var trimmed = string.replace(/[^0-9.-]*/g, "")
+      var amount = parseFloat(trimmed)
+      var dollars = Math.floor(amount)
+      var remainder = amount - dollars
+      var cents = Math.floor(remainder*100)
+
+      return dollars*100 + cents
+    }
+
+    Bond.prototype.eachExpense = function(callback) {
+      for(var description in this.totalsByDescription) {
+        var total = this.totalsByDescription[description]
+        callback(description, total)
+      }
     }
 
 
