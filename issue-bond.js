@@ -1,22 +1,125 @@
 var library = require("module-library")(require)
 
+library.define(
+  "dashify",
+  function() {
+    return function dashify(string) {
+      if (typeof string !== 'string') {
+        throw new TypeError('expected a string');
+      }
+
+      var sentence = [];
+      var needsDash = false;
+
+      for(var i=0; i<string.length; i++) {
+        var char = string[i];
+
+        var isNumber = !Number.isNaN(parseFloat(char));
+
+        if (isNumber) {
+          lower = char;
+        } else {
+          var upper = char.toUpperCase();
+          var lower = char.toLowerCase();
+          var isLetter = upper != lower;
+        } 
+
+        var isAlphaNumeric = isNumber || isLetter;
+
+        if (isNumber) {
+          var isUpper = false;
+        } else if (isLetter) {
+          var isUpper = (char == upper);
+        } else {
+          var isUpper = false;
+        }
+
+        if (needsDash && isAlphaNumeric) {
+          sentence.push("-");
+          needsDash = false;
+        } else if (isUpper && sentence.length) {
+          sentence.push("-");
+        }
+
+        if (isAlphaNumeric) {
+          sentence.push(lower);
+        } else if (sentence.length && !isAlphaNumeric) {
+          needsDash = true;
+        }
+      }
+
+      return sentence.join("");
+    };
+  }
+)
+
+
 module.exports = library.export(
   "issue-bond",
-  ["identifiable"],
-  function(identifiable) {
+  ["identifiable", "dashify"],
+  function(identifiable, dashify) {
 
     var bonds = {}
+    var bondStatus = {}
 
-    // Shares and share orders are indexed together:
-    var shares = {}
+    function issueBond(id, outcome, issuerName) {
+      var bond = new Bond(id, outcome, issuerName)
+      bondStatus[bond.id] = "available"
+      bonds[bond.id] = bond
+      return bond
+    }
+
+    var investors = {}
+    var portfolios = {}
+
+    function registerInvestor(investorId, name, phoneNumber) {
+
+      investorId = identifiable.assignId(investors, investorId)
+      investors[investorId] = {name: name, phoneNumber: phoneNumber}
+      return investorId
+    }
+
     var orders = {}
+    var orderStatus = {}
+    var shareAsset = {}
+    var shareValue = {}
+    var shareOwner = {}
+    var bondShares = {}
+
+    function orderShare(shareId, bondId, investorId, faceValue) {
+
+      if (!investors[investorId]) {
+        throw new Error("issueBond.order third parameter should be an investor id. Something's up.")
+      }
+
+      shareId = identifiable.assignId(orders, shareId)
+
+      var shares = bondShares[bondId]
+      if (!shares) {
+        shares = bondStatus[bondId] = []
+      }
+
+      shares.push(shareId)
+
+      var portfolio = portfolios[investorId]
+
+      if (!portfolio) {
+        portfolio = portfolios[investorId] = []
+      }
+
+      portfolio.push(shareId)
+      shareAsset[shareId] = bondId
+      bondStatus[bondId] = "pending"
+      orderStatus[shareId] = "pending"
+      shareValue[shareId] = faceValue
+      shareOwner[shareId] = investorId
+
+      return shareId
+    }
+
 
     // Above $1,000,000 total sales we have to file this? https://www.sec.gov/about/forms/forms-1.pdf
 
-    function issueBond(id, outcome, issuerName) {
-
-      return new Bond(id, outcome, issuerName)
-    }
 
     function Bond(id, outcome, issuerName) {
 
@@ -31,8 +134,6 @@ module.exports = library.export(
       } else {
         this.id = identifiable.assignId(bonds)
       }
-
-      bonds[this.id] = this
     }
 
     Bond.prototype.tasks = function(additionalTasks) {
@@ -86,68 +187,50 @@ module.exports = library.export(
     }
 
 
-    function orderShares(id, name, phoneNumber, bondId, faceValue) {
+    function eachOfMyOrders(investorId, callback) {
+      var portfolio = portfolios[investorId]
 
-      var order = {
-        id: id,
-        purchaserName: name,
-        phoneNumber: phoneNumber,
-        bondId: bondId,
-        faceValue: faceValue,
-        isPaid: false,
-      }
+      if (!portfolio) { return }
 
-      if (!id) {
-        identifiable.assignId(shares, order)
-      }
+      portfolio.forEach(function(shareId) {
+        var bondId = shareAsset[shareId]
+        var bond = bonds[bondId]
 
-      orders[order.id] = order
-
-      return order
-    }
-
-    function markPaid(orderId, price, signature) {
-      var order = getOrder(orderId)
-      var bond = getBond(order.bondId)
-
-      if (order.isPaid) {
-        throw new Error("Order is already paid")
-      }
-
-      order.isPaid = true
-      order.paid = price
-      bond.shares.push(orderId)
-      bond.paid += price
-      console.log(bond.paid, "paid on bond")
-    }
-
-    var tasksByTag = {}
-    function addTask(bondId, text, tags) {
-      tags.forEach(function(tag) {
-        tag = bondId+"/"+tag
-        if (!tasksByTag[tag]) {tasksByTag[tag] = []
+        var data = {
+          shareId: shareId,
+          outcome: bond.outcome,
+          bondStatus: bondStatus[bondId],
         }
-        tasksByTag[tag].push(text)
+
+        callback(data)
       })
     }
 
-    function eachTaskTagged(bondId, tag, callback) {
-      tasksByTag[bondId+"/"+tag].forEach(callback)
+    function markPaid(orderId, price, signature) {
+
+      var bondId = shareAsset[orderId]
+
+      if (orderStatus[orderId] == "paid") {
+        throw new Error("Order is already paid")
+      } else if (bondStatus[bondId] == "sold") {
+        throw new Error("Bond is already sold")
+      }
+
+      bondStatus[bondId] = "sold"
+      orderStatus[id] = "paid"
     }
 
-    var getBond = issueBond.get = identifiable.getFrom(bonds, {description: "bond"})
+    function getStatus(bondId) {
+      return bondStatus[bondId]
+    }
 
-    issueBond.task = addTask
-
-
-
-    issueBond.eachTaskTagged = eachTaskTagged
-
-    issueBond.order = orderShares
-
-    var getOrder = issueBond.getOrder = identifiable.getFrom(orders, {description: "bond share order"})
-
+    issueBond.registerInvestor =registerInvestor
+    issueBond.order = orderShare
     issueBond.markPaid = markPaid
+
+    issueBond.getStatus = getStatus
+    issueBond.get = identifiable.getFrom(bonds, "bond")
+    issueBond.eachOfMyOrders = eachOfMyOrders
 
     return issueBond
   }
