@@ -187,7 +187,7 @@ module.exports = library.export(
     }
 
 
-    function eachOfMyOrders(investorId, callback) {
+    function eachOfMyShares(investorId, callback) {
       var portfolio = portfolios[investorId]
 
       if (!portfolio) { return }
@@ -199,7 +199,7 @@ module.exports = library.export(
         var data = {
           shareId: shareId,
           outcome: bond.outcome,
-          bondStatus: bondStatus[bondId],
+          status: orderStatus[shareId],
         }
 
         callback(data)
@@ -224,13 +224,20 @@ module.exports = library.export(
       return bondStatus[bondId]
     }
 
+    function describeOrder(shareId) {
+      var bond = bonds[shareAsset[shareId]]
+      return bond.outcome
+    }
+
     issueBond.registerInvestor =registerInvestor
     issueBond.order = orderShare
     issueBond.markPaid = markPaid
 
     issueBond.getStatus = getStatus
     issueBond.get = identifiable.getFrom(bonds, "bond")
-    issueBond.eachOfMyOrders = eachOfMyOrders
+    issueBond.describeOrder = describeOrder
+    issueBond.eachOfMyShares = eachOfMyShares
+    issueBond.getInvestorProfile = identifiable.getFrom(investors, "investor")
 
     return issueBond
   }
