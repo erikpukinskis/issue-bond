@@ -84,7 +84,6 @@ module.exports = library.export(
     var shareAsset = {}
     var shareValue = {}
     var shareOwner = {}
-    var bondShares = {}
 
     function orderShare(shareId, bondId, investorId, faceValue) {
 
@@ -92,29 +91,56 @@ module.exports = library.export(
         throw new Error("issueBond.order third parameter should be an investor id. Something's up.")
       }
 
-      shareId = identifiable.assignId(orders, shareId)
-
-      var shares = bondShares[bondId]
-      if (!shares) {
-        shares = bondStatus[bondId] = []
+      if (bondStatus[bondId] != "available") {
+        throw new Error("Bond "+bondId+" is not for sale")
       }
 
-      shares.push(shareId)
+      shareId = identifiable.assignId(orderStatus, shareId)
+      orderStatus[shareId] = "pending"
 
       var portfolio = portfolios[investorId]
 
       if (!portfolio) {
-        portfolio = portfolios[investorId] = []
+        portfolio = portfolios[investorId] = {}
       }
 
-      portfolio.push(shareId)
+      portfolio[bondId] = shareId
       shareAsset[shareId] = bondId
       bondStatus[bondId] = "pending"
-      orderStatus[shareId] = "pending"
       shareValue[shareId] = faceValue
       shareOwner[shareId] = investorId
 
       return shareId
+    }
+
+    function cancelOrder(shareId) {
+      var currentStatus = orderStatus[shareId]
+      var bondId = shareAsset[shareId]
+
+      if (currentStatus == "paid") {
+        throw new Error("Order "+shareId+" is already paid. Can't cancel.")
+      } else if (currentStatus == "canceled") {
+        throw new Error("Can't cancel "+shareId+" because it's already canceled")
+      }
+
+      orderStatus[shareId] = "canceled"
+      bondStatus[bondId] = "available"
+    }
+
+    function markPaid(shareId, price, signature) {
+
+      var bondId = shareAsset[shareId]
+
+      if (orderStatus[shareId] == "paid") {
+        throw new Error("Order is already paid")
+      } else if (bondStatus[bondId] == "sold") {
+        throw new Error("Bond is already sold")
+      } else if (orderStatus[shareId] == "canceled") {
+        throw new Error("Order was canceled")
+      }
+
+      bondStatus[bondId] = "sold"
+      orderStatus[shareId] = "paid"
     }
 
 
@@ -192,36 +218,20 @@ module.exports = library.export(
 
       if (!portfolio) { return }
 
-      portfolio.forEach(function(shareId) {
-        var bondId = shareAsset[shareId]
+      for(var bondId in portfolio) {
+        var shareId = portfolio[bondId]
         var bond = bonds[bondId]
 
-        var data = {
-          shareId: shareId,
-          outcome: bond.outcome,
-          status: orderStatus[shareId],
-        }
-
-        callback(data)
-      })
-    }
-
-    function markPaid(orderId, price, signature) {
-
-      var bondId = shareAsset[orderId]
-
-      if (orderStatus[orderId] == "paid") {
-        throw new Error("Order is already paid")
-      } else if (bondStatus[bondId] == "sold") {
-        throw new Error("Bond is already sold")
+        callback(shareId, bond.outcome, orderStatus[shareId])
       }
-
-      bondStatus[bondId] = "sold"
-      orderStatus[id] = "paid"
     }
 
     function getStatus(bondId) {
       return bondStatus[bondId]
+    }
+
+    function getOrderStatus(orderId) {
+      return orderStatus[orderId]
     }
 
     function describeOrder(shareId) {
@@ -229,15 +239,25 @@ module.exports = library.export(
       return bond.outcome
     }
 
+    function myOrderOn(bondId, myInvestorId) {
+      var portfolio = portfolios[myInvestorId]
+      if (!portfolio) { return }
+
+      return portfolio[bondId]
+    }
+
     issueBond.registerInvestor =registerInvestor
     issueBond.order = orderShare
     issueBond.markPaid = markPaid
+    issueBond.cancelOrder = cancelOrder
 
     issueBond.getStatus = getStatus
+    issueBond.getOrderStatus = getOrderStatus
     issueBond.get = identifiable.getFrom(bonds, "bond")
     issueBond.describeOrder = describeOrder
     issueBond.eachOfMyShares = eachOfMyShares
     issueBond.getInvestorProfile = identifiable.getFrom(investors, "investor")
+    issueBond.myOrderOn = myOrderOn
 
     return issueBond
   }
