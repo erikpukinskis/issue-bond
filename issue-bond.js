@@ -83,9 +83,10 @@ module.exports = library.export(
     var orderStatus = {}
     var shareAsset = {}
     var shareValue = {}
+    var quotes = {}
     var shareOwner = {}
 
-    function orderShare(shareId, bondId, investorId, faceValue) {
+    function orderShare(shareId, bondId, investorId, faceValue, quote) {
 
       if (!investors[investorId]) {
         throw new Error("issueBond.order third parameter should be an investor id. Something's up.")
@@ -107,7 +108,8 @@ module.exports = library.export(
       portfolio[bondId] = shareId
       shareAsset[shareId] = bondId
       bondStatus[bondId] = "pending"
-      shareValue[shareId] = faceValue
+      shareValue[shareId] = parseMoney(faceValue)
+      quotes[shareId] = parseMoney(quote)
       shareOwner[shareId] = investorId
 
       return shareId
@@ -180,7 +182,7 @@ module.exports = library.export(
       }
     }
 
-    Bond.prototype.salePrice = function() {
+    Bond.prototype.faceValue = function() {
       return Math.floor(this.expensesSubtotal*1.1)
     }
 
@@ -189,13 +191,16 @@ module.exports = library.export(
     }
 
     Bond.prototype.profit = function() {
-      return this.salePrice() - this.totalExpenses()
+      return this.faceValue() - this.totalExpenses()
     }
 
     function parseMoney(string) {
-      if (typeof string != "string") {
+      if (Number.isInteger(string)) {
+        return string
+      } else if (typeof string != "string") {
         throw new Error("Expected "+string+" to be a string representing money")
       }
+      
       var trimmed = string.replace(/[^0-9.-]*/g, "")
       var amount = parseFloat(trimmed)
       var dollars = Math.floor(amount)
@@ -226,6 +231,10 @@ module.exports = library.export(
       }
     }
 
+    function getOwnerId(shareId) {
+      return shareOwner[shareId]
+    }
+
     function getStatus(bondId) {
       return bondStatus[bondId]
     }
@@ -246,8 +255,21 @@ module.exports = library.export(
       return portfolio[bondId]
     }
 
+    function getOrderAsset(shareId) {
+      return shareAsset[shareId]
+    }
+
+    function getShareValue(shareId) {
+      return shareValue[shareId]
+    }
+
+    function getQuote(shareId) {
+      return quotes[shareId]
+    }
+
+
     issueBond.registerInvestor =registerInvestor
-    issueBond.order = orderShare
+    issueBond.orderShare = orderShare
     issueBond.markPaid = markPaid
     issueBond.cancelOrder = cancelOrder
 
@@ -257,7 +279,13 @@ module.exports = library.export(
     issueBond.describeOrder = describeOrder
     issueBond.eachOfMyShares = eachOfMyShares
     issueBond.getInvestorProfile = identifiable.getFrom(investors, "investor")
+    issueBond.getOrderAsset = getOrderAsset
     issueBond.myOrderOn = myOrderOn
+    issueBond.getOwnerId = getOwnerId
+    issueBond.getShareValue = getShareValue
+    issueBond.getQuote = getQuote
+
+
 
     return issueBond
   }
