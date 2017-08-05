@@ -244,7 +244,11 @@ module.exports = library.export(
     }
 
     function describeOrder(shareId) {
-      var bond = bonds[shareAsset[shareId]]
+      var bondId = shareAsset[shareId]
+      if (!bondId) {
+        throw new Error("No share "+shareId)
+      }
+      var bond = bonds[bondId]
       return bond.outcome
     }
 
