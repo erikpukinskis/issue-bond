@@ -129,7 +129,7 @@ module.exports = library.export(
       bondStatus[bondId] = "available"
     }
 
-    function markPaid(shareId, price, signature) {
+    function markPaid(shareId, metadata) {
 
       var bondId = shareAsset[shareId]
 
@@ -183,7 +183,12 @@ module.exports = library.export(
     }
 
     Bond.prototype.faceValue = function() {
-      return Math.floor(this.expensesSubtotal*1.1)
+      return roundToTen(this.expensesSubtotal*1.1)
+    }
+
+    function roundToTen(cents) {
+      var tens = Math.ceil(cents / 1000)
+      return tens*1000
     }
 
     Bond.prototype.totalExpenses = function() {
