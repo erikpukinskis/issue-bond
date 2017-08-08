@@ -59,14 +59,21 @@ module.exports = library.export(
   ["identifiable", "dashify"],
   function(identifiable, dashify) {
 
-    var bonds = {}
+    var outcomes = {}
+    var issuers = {}
     var bondStatus = {}
 
     function issueBond(id, outcome, issuerName) {
-      var bond = new Bond(id, outcome, issuerName)
-      bondStatus[bond.id] = "available"
-      bonds[bond.id] = bond
-      return bond
+
+      if (typeof id != "string") {
+        id = identifiable.assignId(bondStatus)
+      }
+
+      bondStatus[id] = "available"
+      outcomes[id] = outcome
+      issuers[id] = issuerName
+
+      return id
     }
 
     var investors = {}
@@ -148,55 +155,81 @@ module.exports = library.export(
 
     // Above $1,000,000 total sales we have to file this? https://www.sec.gov/about/forms/forms-1.pdf
 
+    var tasks = {}
 
-    function Bond(id, outcome, issuerName) {
-
-      this.outcome = outcome
-      this.issuerName = issuerName
-      this.totalsByDescription = {}
-      this.taskList = []
-      this.expensesSubtotal = 0
-
-      if (typeof id == "string") {
-        this.id = id
+    function addTasks(bondId, additionalTasks) {
+      var list = tasks[bondId]
+      if (list) {
+        tasks[bondId] = list.concat(additionalTasks)
       } else {
-        this.id = identifiable.assignId(bonds)
+        tasks[bondId] = additionalTasks
       }
     }
 
-    Bond.prototype.tasks = function(additionalTasks) {
-      this.taskList = this.taskList.concat(additionalTasks)
+    function eachTask(bondId, callback) {
+      for(var i=0; i<tasks[bondId].length; i++) {
+        callback(tasks[bondId][i])
+      }
     }
 
-    Bond.prototype.getTasks = function() {
-      return this.taskList
-    }
+    var expenses = {}
+    var expenseTotals = {}
 
-    Bond.prototype.expenses = function(totalsByDescription) {
-      if (Array.isArray(totalsByDescription)) { return }
+    function addExpenses(bondId, totalsByDescription) {
+      if (Array.isArray(
+        totalsByDescription)) { 
+        console.log("Arrays of expenses need to be hashes of expense: price")
+        return
+      }
+
+      var forThisBond = expenses[bondId]
+
+      if (!expenseTotals[bondId]) {
+        expenseTotals[bondId] = 0
+      }
 
       for(var description in totalsByDescription) {
+
+        if (typeof forThisBond == "undefined") {
+          forThisBond = expenses[bondId] = {}
+        }
+
         var subtotal = parseMoney(totalsByDescription[description])
-        this.expensesSubtotal += subtotal
-        this.totalsByDescription[description] = subtotal
+
+        expenseTotals[bondId] += subtotal
+
+        if (typeof forThisBond[description] != "undefined") {
+          throw new Error("Already set that expense")
+        }
+
+        forThisBond[description] = subtotal
       }
     }
 
-    Bond.prototype.faceValue = function() {
-      return roundToTen(this.expensesSubtotal*1.1)
+    function eachExpense(bondId, callback) {
+
+      var forThisBond = expenses[bondId]
+
+      for(var description in forThisBond) {
+        var total = forThisBond[description]
+        callback(description, total)
+      }
+    }
+
+    function calculateFinancials(bondId) {
+      var financials = {
+        totalExpenses: expenseTotals[bondId],
+        faceValue: roundToTen(expenseTotals[bondId]*1.1),
+      }
+
+      financials.profit = financials.faceValue - financials.totalExpenses
+
+      return financials
     }
 
     function roundToTen(cents) {
       var tens = Math.ceil(cents / 1000)
       return tens*1000
-    }
-
-    Bond.prototype.totalExpenses = function() {
-      return this.expensesSubtotal
-    }
-
-    Bond.prototype.profit = function() {
-      return this.faceValue() - this.totalExpenses()
     }
 
     function parseMoney(string) {
@@ -214,14 +247,6 @@ module.exports = library.export(
 
       return dollars*100 + cents
     }
-
-    Bond.prototype.eachExpense = function(callback) {
-      for(var description in this.totalsByDescription) {
-        var total = this.totalsByDescription[description]
-        callback(description, total)
-      }
-    }
-
 
     function eachOfMyShares(investorId, callback) {
       var portfolio = portfolios[investorId]
@@ -276,15 +301,26 @@ module.exports = library.export(
       return quotes[shareId]
     }
 
+    function getOutcome(bondId) {
+      return outcomes[bondId]
+    }
+
+    function describeIssuer(bondId) {
+      return issuers[bondId]
+    }
 
     issueBond.registerInvestor =registerInvestor
     issueBond.orderShare = orderShare
     issueBond.markPaid = markPaid
     issueBond.cancelOrder = cancelOrder
+    issueBond.expenses = addExpenses
+    issueBond.tasks = addTasks
 
+    issueBond.eachExpense = eachExpense
+    issueBond.eachTask = eachTask
+    issueBond.calculateFinancials = calculateFinancials
     issueBond.getStatus = getStatus
     issueBond.getOrderStatus = getOrderStatus
-    issueBond.get = identifiable.getFrom(bonds, "bond")
     issueBond.describeOrder = describeOrder
     issueBond.eachOfMyShares = eachOfMyShares
     issueBond.getInvestorProfile = identifiable.getFrom(investors, "investor")
@@ -293,6 +329,8 @@ module.exports = library.export(
     issueBond.getOwnerId = getOwnerId
     issueBond.getShareValue = getShareValue
     issueBond.getQuote = getQuote
+    issueBond.getOutcome = getOutcome
+    issueBond.describeIssuer = describeIssuer
 
 
 
