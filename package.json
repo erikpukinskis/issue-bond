@@ -1,6 +1,6 @@
 {
   "name": "issue-bond",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Let people take a bet on the future",
   "main": "issue-bond.js",
   "dependencies": {
