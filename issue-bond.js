@@ -255,9 +255,8 @@ module.exports = library.export(
 
       for(var bondId in portfolio) {
         var shareId = portfolio[bondId]
-        var bond = bonds[bondId]
 
-        callback(shareId, bond.outcome, orderStatus[shareId])
+        callback(shareId, outcomes[bondId], orderStatus[shareId])
       }
     }
 
@@ -278,8 +277,7 @@ module.exports = library.export(
       if (!bondId) {
         throw new Error("No share "+shareId)
       }
-      var bond = bonds[bondId]
-      return bond.outcome
+      return outcomes[bondId]
     }
 
     function myOrderOn(bondId, myInvestorId) {
