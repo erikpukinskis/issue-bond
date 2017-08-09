@@ -67,6 +67,8 @@ module.exports = library.export(
 
       if (typeof id != "string") {
         id = identifiable.assignId(bondStatus)
+      } else if (id.match(/[^a-z0-9-]/)) {
+        throw new Error("Bond id can only have numbers, letters, and dashes")
       }
 
       bondStatus[id] = "available"
@@ -136,6 +138,8 @@ module.exports = library.export(
       bondStatus[bondId] = "available"
     }
 
+    var activeBonds = []
+
     function markPaid(shareId, metadata) {
 
       var bondId = shareAsset[shareId]
@@ -149,16 +153,40 @@ module.exports = library.export(
       }
 
       bondStatus[bondId] = "sold"
+      activeBonds.push(bondId)
       orderStatus[shareId] = "paid"
     }
+
+    function eachActiveBond(callback) {
+      activeBonds.forEach(callback)
+    }
+
+    function isIssued(bondId) {
+      var status = bondStatus[bondId]
+      return status != "available"
+    }
+
+    function matureBond(bondId) {
+      throw new Error("impl")
+    }
+
 
 
     // Above $1,000,000 total sales we have to file this? https://www.sec.gov/about/forms/forms-1.pdf
 
     var tasks = {}
+    var contiguousProgress = {}
+    var completedCount = {}
+    var taskIsCompleted = {}
 
     function addTasks(bondId, additionalTasks) {
+
+      if (isIssued(bondId)) {
+        throw new Error("Bond "+bondId+" is already issued. Can't add more tasks.")
+      }
+
       var list = tasks[bondId]
+
       if (list) {
         tasks[bondId] = list.concat(additionalTasks)
       } else {
@@ -166,10 +194,67 @@ module.exports = library.export(
       }
     }
 
+    function markFinished(taskId) {
+      var bondId = bondForTask(taskId)
+      var index = indexInBond(taskId)
+
+      var previouslyCompleted = completedCount[bondId] || 0
+      var lastContiguous = contiguousProgress[bondId] || 0
+
+      if (lastContiguous == index) {
+        contiguousProgress[bondId] = lastContiguous + 1
+      }
+
+      var completed = completedCount[bondId]
+
+      completedCount[bondId] = previouslyCompleted + 1
+
+      taskIsCompleted[taskId] = true
+
+      if (!tasks[bondId]) {
+        throw new Error("Bond "+bondId+" has no tasks?")
+      }
+      
+      if (completedCount[bondId] == tasks[bondId].length) {
+        matureBond(bondId)
+      }
+    }
+
     function eachTask(bondId, callback) {
       for(var i=0; i<tasks[bondId].length; i++) {
         callback(tasks[bondId][i])
       }
+    }
+
+    function nextTaskId(bondId) {
+      var index = contiguousProgress[bondId] || 0
+      return taskId(bondId, index)
+    }
+
+    function getTaskText(taskId) {
+      var bondId = bondForTask(taskId)
+      var i = indexInBond(taskId)
+      return tasks[bondId][i]
+    }
+
+    function getCompletedCount(bondId) {
+      return completedCount[bondId] || 0
+    }
+
+    function getTaskCount(bondId) {
+      return tasks[bondId].length
+    }
+
+    function taskId(bondId, i) {
+      return bondId+"_t"+i
+    }
+
+    function indexInBond(taskId) {
+      return parseInt(taskId.split("_t")[1])
+    }
+
+    function bondForTask(taskId) {
+      return taskId.split("_t")[0]
     }
 
     var expenses = {}
@@ -315,7 +400,6 @@ module.exports = library.export(
     issueBond.tasks = addTasks
 
     issueBond.eachExpense = eachExpense
-    issueBond.eachTask = eachTask
     issueBond.calculateFinancials = calculateFinancials
     issueBond.getStatus = getStatus
     issueBond.getOrderStatus = getOrderStatus
@@ -329,8 +413,15 @@ module.exports = library.export(
     issueBond.getQuote = getQuote
     issueBond.getOutcome = getOutcome
     issueBond.describeIssuer = describeIssuer
+    issueBond.eachActiveBond = eachActiveBond
 
-
+    issueBond.eachTask = eachTask
+    issueBond.nextTaskId = nextTaskId
+    issueBond.getTaskText = getTaskText
+    issueBond.markFinished = markFinished
+    issueBond.getCompletedCount = getCompletedCount
+    issueBond.getTaskCount = getTaskCount
+    issueBond.bondForTask = bondForTask
 
     return issueBond
   }
