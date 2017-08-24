@@ -170,7 +170,49 @@ module.exports = library.export(
       throw new Error("impl")
     }
 
+    var invoices = {}
+    var invoicesByBondDay = {}
 
+    function addInvoice(invoiceId, bondId, description, cents, day) {
+
+      if (!invoiceId) {
+        invoiceId = identifiable.assignId(invoices)
+      }
+
+      var bondDay = bondId+"+"+day
+
+      var invoice = {
+        invoiceId: invoiceId,
+        status: "issued",
+        bondId: bondId,
+        description: description,
+        amount: cents,
+        day: day,
+      }
+
+      invoices[invoiceId] = invoice
+
+      addToList(invoicesByBondDay, bondDay, invoiceId)
+
+      return invoiceId
+    }
+
+
+    function dailySummary(bondId, day) {
+      var bondDay = bondId+"+"+day
+
+      var taskIds = completedTasksByBondDay[bondDay] || []
+      var invoices = invoicesByBondDay[bondDay] || []
+
+      return {
+        completedTasks: taskIds.map(getTaskText),
+        invoices: invoices.map(toInvoice)
+      }
+    }
+
+    function toInvoice(id) {
+      return invoices[id]
+    }
 
     // Above $1,000,000 total sales we have to file this? https://www.sec.gov/about/forms/forms-1.pdf
 
@@ -194,6 +236,8 @@ module.exports = library.export(
       }
     }
 
+    var completedTasksByBondDay = {}
+
     function markFinished(taskId) {
       var bondId = bondForTask(taskId)
       var index = indexInBond(taskId)
@@ -214,7 +258,12 @@ module.exports = library.export(
       if (!tasks[bondId]) {
         throw new Error("Bond "+bondId+" has no tasks?")
       }
-      
+
+      var day = localDay(new Date())
+      var bondDay = bondId+"+"+day
+
+      addToList(completedTasksByBondDay, bondDay, taskId)
+
       if (completedCount[bondId] == tasks[bondId].length) {
         matureBond(bondId)
       }
@@ -392,12 +441,36 @@ module.exports = library.export(
       return issuers[bondId]
     }
 
+
+    // Generic helpers
+
+    function addToList(lists, id, newItem) {
+      var list = lists[id]
+      if (!list) {
+        list = lists[id] = []
+      }
+      list.push(newItem)
+    }
+
+    function localDay(time) {
+      if (!time) {
+        time = new Date()
+      }
+      var minutesOffset = time.getTimezoneOffset()
+      var millisecondsOffset = minutesOffset*60*1000
+      var local = new Date(time - millisecondsOffset)
+      return local.toISOString().substr(0, 10)
+    }
+
+    // Interface
+
     issueBond.registerInvestor =registerInvestor
     issueBond.orderShare = orderShare
     issueBond.markPaid = markPaid
     issueBond.cancelOrder = cancelOrder
     issueBond.expenses = addExpenses
     issueBond.tasks = addTasks
+    issueBond.invoice = addInvoice
 
     issueBond.eachExpense = eachExpense
     issueBond.calculateFinancials = calculateFinancials
@@ -414,6 +487,7 @@ module.exports = library.export(
     issueBond.getOutcome = getOutcome
     issueBond.describeIssuer = describeIssuer
     issueBond.eachActiveBond = eachActiveBond
+    issueBond.dailySummary = dailySummary
 
     issueBond.eachTask = eachTask
     issueBond.nextTaskId = nextTaskId
@@ -422,6 +496,8 @@ module.exports = library.export(
     issueBond.getCompletedCount = getCompletedCount
     issueBond.getTaskCount = getTaskCount
     issueBond.bondForTask = bondForTask
+
+    issueBond.date = localDay
 
     return issueBond
   }
