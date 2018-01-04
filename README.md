@@ -9,7 +9,7 @@ var bond = issueBond (
   "Erik Pukinskis" )
 ```
 
-Then you can add work and expenses which are required to achieve the outcome.
+Then you can add work and expenses which are required to achieve the outcome:
 
 ```javascript
 bond.addTasks ( [
@@ -34,7 +34,7 @@ bond.expense (
   "$10" )
 ```
 
-Then the bond can be purchased and executed:
+The bond is purchased and executed:
 
 ```javascript
 var investorId = issueBond.registerInvestor(
@@ -71,6 +71,6 @@ issueBond.markFinished (
   "cut studs to length" )
 //...
 
-// and then there will be some way to mature the bond and pay out the investor here...
+// and then there will be some way to mature the bond and pay out the investor here... no need to write that code until we have more revenue than expenses.
 
 ```
