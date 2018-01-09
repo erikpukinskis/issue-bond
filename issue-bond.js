@@ -95,15 +95,15 @@ module.exports = library.export(
     var quotes = {}
     var shareOwner = {}
 
-    function orderShare(shareId, bondId, investorId, faceValue, quote) {
+    function orderShares(shareId, bondId, investorId, faceValue, quote) {
 
       if (!investors[investorId]) {
-        throw new Error("issueBond.order third parameter should be an investor id. Something's up.")
+        throw new Error("issueBond.orderShares third parameter should be an investor id. Something's up.")
       }
 
-      if (bondStatus[bondId] != "available") {
-        throw new Error("Bond "+bondId+" is not for sale")
-      }
+      // if (bondStatus[bondId] != "available") {
+      //   throw new Error("Bond "+bondId+" is not for sale")
+      // }
 
       shareId = identifiable.assignId(orderStatus, shareId)
       orderStatus[shareId] = "pending"
@@ -197,6 +197,29 @@ module.exports = library.export(
       return invoiceId
     }
 
+    var lineItems = {}
+    var lineItemCosts = {}
+
+    function lineItem(bondId, invoiceId, description, cost) {
+
+      addToList(lineItems, bondId+invoiceId, description)
+
+      addToList(lineItemCosts, bondId+invoiceId, cost)
+    }
+
+      // throw new Error("function("+Array.prototype.map.call(arguments, JSON.stringify).join(", ")+") { ... } should be defined")
+
+    function settleUp(bondId, invoiceId, amount, fees) {
+
+    }
+
+    function revenue(bondId, description, proceeds) {
+
+    }
+
+    function mature(bondId, quoteId, maturityId, amount) {
+
+    }
 
     function dailySummary(bondId, day) {
       var bondDay = bondId+"+"+day
@@ -309,12 +332,7 @@ module.exports = library.export(
     var expenses = {}
     var expenseTotals = {}
 
-    function addExpenses(bondId, totalsByDescription) {
-      if (Array.isArray(
-        totalsByDescription)) { 
-        console.log("Arrays of expenses need to be hashes of expense: price")
-        return
-      }
+    function addExpense(bondId, description, cost) {
 
       var forThisBond = expenses[bondId]
 
@@ -322,21 +340,33 @@ module.exports = library.export(
         expenseTotals[bondId] = 0
       }
 
-      for(var description in totalsByDescription) {
+      if (typeof forThisBond == "undefined") {
+        forThisBond = expenses[bondId] = {}
+      }
 
-        if (typeof forThisBond == "undefined") {
-          forThisBond = expenses[bondId] = {}
-        }
+      var subtotal = parseMoney(cost)
+
+      expenseTotals[bondId] += subtotal
+
+      if (typeof forThisBond[description] != "undefined") {
+        throw new Error("Already set that expense")
+      }
+
+      forThisBond[description] = subtotal
+    }
+
+    function addExpenses(bondId, totalsByDescription) {
+      if (Array.isArray(
+        totalsByDescription)) { 
+        console.log("Expense lists need to be hashes of expense: price")
+        return
+      }
+
+      for(var description in totalsByDescription) {
 
         var subtotal = parseMoney(totalsByDescription[description])
 
-        expenseTotals[bondId] += subtotal
-
-        if (typeof forThisBond[description] != "undefined") {
-          throw new Error("Already set that expense")
-        }
-
-        forThisBond[description] = subtotal
+        addExpense(bondId, description, subtotal)
       }
     }
 
@@ -368,7 +398,8 @@ module.exports = library.export(
 
     function parseMoney(string) {
       if (Number.isInteger(string)) {
-        return string
+        var cents = string
+        return cents
       } else if (typeof string != "string") {
         throw new Error("Expected "+string+" to be a string representing money")
       }
@@ -441,8 +472,47 @@ module.exports = library.export(
       return issuers[bondId]
     }
 
+    // Mutators
 
-    // Generic helpers
+    issueBond.registerInvestor =registerInvestor
+    issueBond.orderShares = orderShares
+    issueBond.markPaid = markPaid
+    issueBond.cancelOrder = cancelOrder
+    issueBond.expenses = addExpenses
+    issueBond.expense = addExpense
+    issueBond.tasks = addTasks
+    issueBond.invoice = addInvoice
+    issueBond.lineItem = lineItem
+    issueBond.settleUp = settleUp
+    issueBond.revenue = revenue
+    issueBond.mature = mature
+
+    // Getters
+
+    issueBond.eachExpense = eachExpense
+    issueBond.calculateFinancials = calculateFinancials
+    issueBond.getStatus = getStatus
+    issueBond.getOrderStatus = getOrderStatus
+    issueBond.describeOrder = describeOrder
+    issueBond.eachOfMyShares = eachOfMyShares
+    issueBond.getInvestorProfile = identifiable.getFrom(investors, "investor")
+    issueBond.getOrderAsset = getOrderAsset
+    issueBond.myOrderOn = myOrderOn
+    issueBond.getOwnerId = getOwnerId
+    issueBond.getShareValue = getShareValue
+    issueBond.getQuote = getQuote
+    issueBond.getOutcome = getOutcome
+    issueBond.describeIssuer = describeIssuer
+    issueBond.eachActiveBond = eachActiveBond
+    issueBond.dailySummary = dailySummary
+    issueBond.eachTask = eachTask
+    issueBond.nextTaskId = nextTaskId
+    issueBond.getTaskText = getTaskText
+    issueBond.markFinished = markFinished
+    issueBond.getCompletedCount = getCompletedCount
+    issueBond.getTaskCount = getTaskCount
+    issueBond.bondForTask = bondForTask
+    issueBond.date = localDay
 
     function addToList(lists, id, newItem) {
       var list = lists[id]
@@ -461,43 +531,6 @@ module.exports = library.export(
       var local = new Date(time - millisecondsOffset)
       return local.toISOString().substr(0, 10)
     }
-
-    // Interface
-
-    issueBond.registerInvestor =registerInvestor
-    issueBond.orderShare = orderShare
-    issueBond.markPaid = markPaid
-    issueBond.cancelOrder = cancelOrder
-    issueBond.expenses = addExpenses
-    issueBond.tasks = addTasks
-    issueBond.invoice = addInvoice
-
-    issueBond.eachExpense = eachExpense
-    issueBond.calculateFinancials = calculateFinancials
-    issueBond.getStatus = getStatus
-    issueBond.getOrderStatus = getOrderStatus
-    issueBond.describeOrder = describeOrder
-    issueBond.eachOfMyShares = eachOfMyShares
-    issueBond.getInvestorProfile = identifiable.getFrom(investors, "investor")
-    issueBond.getOrderAsset = getOrderAsset
-    issueBond.myOrderOn = myOrderOn
-    issueBond.getOwnerId = getOwnerId
-    issueBond.getShareValue = getShareValue
-    issueBond.getQuote = getQuote
-    issueBond.getOutcome = getOutcome
-    issueBond.describeIssuer = describeIssuer
-    issueBond.eachActiveBond = eachActiveBond
-    issueBond.dailySummary = dailySummary
-
-    issueBond.eachTask = eachTask
-    issueBond.nextTaskId = nextTaskId
-    issueBond.getTaskText = getTaskText
-    issueBond.markFinished = markFinished
-    issueBond.getCompletedCount = getCompletedCount
-    issueBond.getTaskCount = getTaskCount
-    issueBond.bondForTask = bondForTask
-
-    issueBond.date = localDay
 
     return issueBond
   }
