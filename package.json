@@ -4,8 +4,8 @@
   "description": "Let people take a bet on the future",
   "main": "issue-bond.js",
   "dependencies": {
-    "module-library": "*",
-    "identifiable": "*"
+    "identifiable": "*",
+    "module-library": "*"
   },
   "scripts": {
     "test": "node test"

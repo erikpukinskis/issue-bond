@@ -139,7 +139,7 @@ module.exports = library.export(
 
       invoices[invoiceId] = invoice
 
-      addToList(invoicesByBondDay, bondDay, invoiceId)
+      identifiable.list.add(invoicesByBondDay, bondDay, invoiceId)
 
       return invoiceId
     }
@@ -149,9 +149,9 @@ module.exports = library.export(
 
     function lineItem(bondId, invoiceId, description, cost) {
 
-      addToList(lineItems, bondId+invoiceId, description)
+      identifiable.list.add(lineItems, bondId+invoiceId, description)
 
-      addToList(lineItemCosts, bondId+invoiceId, cost)
+      identifiable.list.add(lineItemCosts, bondId+invoiceId, cost)
     }
 
       // throw new Error("function("+Array.prototype.map.call(arguments, JSON.stringify).join(", ")+") { ... } should be defined")
@@ -171,12 +171,9 @@ module.exports = library.export(
     function dailySummary(bondId, day) {
       var bondDay = bondId+"+"+day
 
-      var taskIds = completedTasksByBondDay[bondDay] || []
-      var invoices = invoicesByBondDay[bondDay] || []
-
       return {
-        completedTasks: taskIds.map(getTaskText),
-        invoices: invoices.map(toInvoice)
+        completedTasks: identifiable.list.map(bondDay, taskIds, getTaskText),
+        invoices: identifiable.list.map(bondDay, invoices, toInvoice)
       }
     }
 
@@ -232,7 +229,7 @@ module.exports = library.export(
       var day = localDay(new Date())
       var bondDay = bondId+"+"+day
 
-      addToList(completedTasksByBondDay, bondDay, taskId)
+      identifiable.list.add(completedTasksByBondDay, bondDay, taskId)
 
       if (completedCount[bondId] == tasks[bondId].length) {
         matureBond(bondId)
@@ -460,14 +457,6 @@ module.exports = library.export(
     issueBond.getTaskCount = getTaskCount
     issueBond.bondForTask = bondForTask
     issueBond.date = localDay
-
-    function addToList(lists, id, newItem) {
-      var list = lists[id]
-      if (!list) {
-        list = lists[id] = []
-      }
-      list.push(newItem)
-    }
 
     function localDay(time) {
       if (!time) {
